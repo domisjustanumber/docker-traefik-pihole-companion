@@ -2,8 +2,9 @@
 
 source /assets/functions/00-container
 prepare_service single
-PROCESS_NAME="traefik-cloudflare-companion"
+PROCESS_NAME="traefik-pihole-companion"
 
 bootstrap_filesystem
 sanity_test
 liftoff
+ 

@@ -30,6 +30,8 @@ sanity_test() {
         fi
     fi
 
-    sanity_var TARGET_DOMAIN "Target Domain"
+    sanity_var PH_URL "PiHole URL"
+    sanity_var PH_TOKEN "PiHole API Token"
+    sanity_var TARGET_IP "Target IP"
     sanity_var DOMAIN1 "Domain 1"
 }

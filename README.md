@@ -1,9 +1,9 @@
-# github.com/tiredofit/docker-traefik-cloudflare-companion
+# github.com/tiredofit/docker-traefik-pihole-companion
 
-[![GitHub release](https://img.shields.io/github/v/tag/tiredofit/docker-traefik-cloudflare-companion?style=flat-square)](https://github.com/tiredofit/docker-traefik-cloudflare-companion/releases/latest)
-[![Build Status](https://img.shields.io/github/actions/workflow/status/tiredofit/docker-traefik-cloudflare-companionmain.yml?branch=main&style=flat-square)](https://github.com/tiredofit/docker-traefik-cloudflare-companion.git/actions)
-[![Docker Stars](https://img.shields.io/docker/stars/tiredofit/traefik-cloudflare-companion.svg?style=flat-square&logo=docker)](https://hub.docker.com/r/tiredofit/traefik-cloudflare-companion/)
-[![Docker Pulls](https://img.shields.io/docker/pulls/tiredofit/traefik-cloudflare-companion.svg?style=flat-square&logo=docker)](https://hub.docker.com/r/tiredofit/traefik-cloudflare-companion/)
+[![GitHub release](https://img.shields.io/github/v/tag/tiredofit/docker-traefik-pihole-companion?style=flat-square)](https://github.com/tiredofit/docker-traefik-pihole-companion/releases/latest)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/tiredofit/docker-traefik-pihole-companionmain.yml?branch=main&style=flat-square)](https://github.com/tiredofit/docker-traefik-pihole-companion.git/actions)
+[![Docker Stars](https://img.shields.io/docker/stars/tiredofit/traefik-pihole-companion.svg?style=flat-square&logo=docker)](https://hub.docker.com/r/tiredofit/traefik-pihole-companion/)
+[![Docker Pulls](https://img.shields.io/docker/pulls/tiredofit/traefik-pihole-companion.svg?style=flat-square&logo=docker)](https://hub.docker.com/r/tiredofit/traefik-pihole-companion/)
 [![Become a sponsor](https://img.shields.io/badge/sponsor-tiredofit-181717.svg?logo=github&style=flat-square)](https://github.com/sponsors/tiredofit)
 [![Paypal Donate](https://img.shields.io/badge/donate-paypal-00457c.svg?logo=paypal&style=flat-square)](https://www.paypal.me/tiredofit)
 
@@ -63,15 +63,15 @@ This will build a Docker image to automatically update [Cloudflare](https://www.
 Clone this repository and build the image with `docker build -t (imagename) .`
 
 ### Prebuilt Images
-Builds of the image are available on [Docker Hub](https://hub.docker.com/r/tiredofit/traefik-cloudflare-companion)
+Builds of the image are available on [Docker Hub](https://hub.docker.com/r/tiredofit/traefik-pihole-companion)
 
 ```bash
-docker pull docker.io/tiredofit/traefik-cloudflare-companion:(imagetag)
+docker pull docker.io/tiredofit/traefik-pihole-companion:(imagetag)
 ```
-Builds of the image are also available on the [Github Container Registry](https://github.com/tiredofit/docker-traefik-cloudflare-companion/pkgs/container/docker-traefik-cloudflare-companion)
+Builds of the image are also available on the [Github Container Registry](https://github.com/tiredofit/docker-traefik-pihole-companion/pkgs/container/docker-traefik-pihole-companion)
 
 ```
-docker pull ghcr.io/tiredofit/docker-traefik-cloudflare-companion:(imagetag)
+docker pull ghcr.io/tiredofit/docker-traefik-pihole-companion:(imagetag)
 ```
 
 The following image tags are available along with their tagged release based on what's written in the [Changelog](CHANGELOG.md):
@@ -268,7 +268,7 @@ services:
 For debugging and maintenance purposes you may want access the containers shell.
 
 ```bash
-docker exec -it (whatever your container name is e.g. traefik-cloudflare-companion) bash
+docker exec -it (whatever your container name is e.g. traefik-pihole-companion) bash
 ```
 
 ## Support
@@ -295,5 +295,5 @@ MIT. See [LICENSE](LICENSE) for more details.
 ## References
 
 * https://www.cloudflare.com
-* https://github.com/tiredofit/docker-traefik-cloudflare-companion
+* https://github.com/tiredofit/docker-traefik-pihole-companion
 * https://github.com/code5-lab/dns-flare

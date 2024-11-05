@@ -2,13 +2,13 @@ ARG DISTRO="alpine"
 ARG DISTRO_VARIANT="3.20"
 
 FROM docker.io/tiredofit/${DISTRO}:${DISTRO_VARIANT}-7.10.15
-LABEL maintainer="Dave Conroy (github.com/tiredofit)"
+LABEL maintainer="Dom Scott (github.com/domisjustanumber)"
 
 ENV CONTAINER_ENABLE_MESSAGING=FALSE \
     CONTAINER_ENABLE_SCHEDULING=FALSE \
     CONTAINER_PROCESS_RUNAWAY_PROTECTOR=FALSE \
-    IMAGE_NAME="tiredofit/traefik-cloudflare-companion" \
-    IMAGE_REPO_URL="https://github.com/tiredofit/docker-traefik-cloudflare-companion/"
+    IMAGE_NAME="domscott/traefik-pihole-companion" \
+    IMAGE_REPO_URL="https://github.com/domisjustanumber/docker-traefik-pihole-companion/"
 
 RUN source /assets/functions/00-container && \
     set -x && \
@@ -51,7 +51,6 @@ RUN source /assets/functions/00-container && \
                 && \
     \
     pip install --break-system-packages \
-            cloudflare==2.19.* \
             get-docker-secret \
             requests \
             && \

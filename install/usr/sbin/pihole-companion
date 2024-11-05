@@ -5,7 +5,7 @@ from datetime import datetime
 
 from get_docker_secret import get_docker_secret
 import atexit
-import CloudFlare
+# import CloudFlare
 import docker
 import logging
 from logging.handlers import RotatingFileHandler
@@ -19,8 +19,120 @@ import time
 import threading
 from urllib.parse import urlparse
 
+class PiHoleAPIError(Exception):
+    """Custom exception for PiHoleAPI errors."""
+    pass
+
+class PiHoleAPI:
+    def __init__(self, pihole_url, api_token):
+        """
+        Initialize the PiHoleAPI object with Pi-hole URL and API token.
+        
+        :param pihole_url: URL of the Pi-hole server (e.g., "http://your-pihole-ip/admin")
+        :param api_token: API token for authentication
+        """
+        self.pihole_url = pihole_url
+        self.api_token = api_token
+
+    def get_custom_dns_records(self):
+        """
+        Retrieve all custom DNS records from Pi-hole.
+        
+        :return: Dictionary of DNS names and their IP addresses
+        :raises PiHoleAPIError: If the request fails
+        """
+        url = f"{self.pihole_url}/api.php"
+        params = {
+            "customdns": "",
+            "action": "get",
+            "auth": self.api_token
+        }
+        response = requests.get(url, params=params)
+
+        if response.status_code == 200:
+            records = response.json().get("data", [])
+            # print("Records: ", records)
+            # print("")
+            # print("")
+
+            # Build a dictionary of domain: IP pairs
+            if isinstance(records, list):
+                # return {domain: ip for domain, ip in records}
+                return [{"domain": domain, "ip": ip} for domain, ip in records]
+            else:
+                raise PiHoleAPIError("Unexpected data format for custom DNS records")
+        else:
+            raise PiHoleAPIError(f"Failed to retrieve custom DNS records: {response.status_code} {response.text}")
+
+    def add_custom_dns_record(self, domain, ip):
+        """
+        Add a new custom DNS record to Pi-hole.
+        
+        :param domain: Domain name for the DNS record
+        :param ip: IP address for the DNS record
+        :return: Success message or error message
+        :raises PiHoleAPIError: If the request fails
+        """
+        url = f"{self.pihole_url}/api.php"
+        params = {
+            "customdns": "",
+            "action": "add",
+            "domain": domain,
+            "ip": ip,
+            "auth": self.api_token
+        }
+        response = requests.get(url, params=params)
+
+        if response.status_code == 200:
+            return response.json()
+        else:
+            raise PiHoleAPIError(f"Failed to add DNS record: {response.status_code} {response.text}")
+
+    def delete_custom_dns_record(self, domain, ip):
+        """
+        Delete an existing custom DNS record by domain name.
+        
+        :param domain: Domain name of the DNS record to delete
+        :return: Success message or error message
+        :raises PiHoleAPIError: If the request fails
+        """
+        url = f"{self.pihole_url}/api.php"
+        params = {
+            "customdns": "",
+            "action": "delete",
+            "domain": domain,
+            "ip": ip,
+            "auth": self.api_token
+        }
+        response = requests.get(url, params=params)
+
+        if response.status_code == 200:
+            return response.json()
+        else:
+            raise PiHoleAPIError(f"Failed to delete DNS record: {response.status_code} {response.text}")
+
+    def update_custom_dns_record(self, domain, new_ip):
+        """
+        Update an existing custom DNS record with a new IP address.
+        
+        :param domain: Domain name for the DNS record to update
+        :param new_ip: New IP address for the DNS record
+        :return: Success message or error message
+        :raises PiHoleAPIError: If the request fails
+        """
+        existing_records = self.get_custom_dns_records()
+
+        # Find the record that matches the given domain
+        matching_record = next((record for record in existing_records if record["domain"] == domain), None)
+        if matching_record:
+            old_ip = matching_record["ip"]
+            self.delete_custom_dns_record(domain, old_ip)
+            return self.add_custom_dns_record(domain, new_ip)
+        else:
+            return self.add_custom_dns_record(domain, new_ip)
+            # raise PiHoleAPIError(f"DNS record for domain '{domain}' not found.")
+
 DRY_RUN = os.environ.get('DRY_RUN', "FALSE")
-DEFAULT_TTL = int(os.environ.get('DEFAULT_TTL', "1"))
 ENABLE_DOCKER_POLL = os.environ.get('ENABLE_DOCKER_POLL', "TRUE")
 DOCKER_SWARM_MODE = os.environ.get('DOCKER_SWARM_MODE', "FALSE")
 ENABLE_TRAEFIK_POLL = os.environ.get('ENABLE_TRAEFIK_POLL', "FALSE")
@@ -95,10 +207,7 @@ def init_doms_from_env():
         try:
             dom = {
                 'name': name,
-                'proxied': os.environ.get("{}_PROXIED".format(k), "FALSE").upper() == "TRUE",
-                'zone_id': os.environ["{}_ZONE_ID".format(k)],
-                'ttl': int(os.environ.get("{}_TTL".format(k), DEFAULT_TTL)),
-                'target_domain': os.environ.get("{}_TARGET_DOMAIN".format(k), target_domain),
+                'target_ip': os.environ.get("{}_TARGET_IP".format(k), target_ip),
                 'comment': os.environ.get("{}_COMMENT".format(k)),
                 'excluded_sub_domains': list(filter(None, os.environ.get("{}_EXCLUDED_SUB_DOMAINS".format(k), "").split(','))),
             }
@@ -112,7 +221,6 @@ def init_doms_from_env():
         logger.debug("Domain Configuration: %s", dom)
 
     return doms
-
 
 def init_traefik_from_env():
     TRAEFIK_INCLUDED_HOST = re.compile('^TRAEFIK_INCLUDED_HOST[0-9]+$', re.IGNORECASE)
@@ -163,54 +271,47 @@ def is_matching(host, regexes):
             return True
     return False
 
-# Start Program to update the Cloudflare
+# Start Program to update PiHole
 def point_domain(name, domain_infos):
+    # logger.info("Called point domain for", name, domain_infos)
     ok = True
     for domain_info in domain_infos:
-        if name == domain_info['target_domain']:
-            continue
-
         if name.find(domain_info['name']) >= 0:
+            # print("domain_info['name']: ", domain_info['name'])
+            # print("name: ", name)
             if is_domain_excluded(name, domain_info):
                 continue
 
-            records = cf.zones.dns_records.get(domain_info['zone_id'], params={u'name': name})
-            data = {
-                u'type': RC_TYPE,
-                u'name': name,
-                u'content': domain_info['target_domain'],
-                u'ttl': int(domain_info['ttl']),
-                u'proxied': domain_info['proxied'],
-                u'comment': domain_info['comment']
-            }
+            # records = cf.zones.dns_records.get(domain_info['zone_id'], params={u'name': name})
+            records = pihole.get_custom_dns_records()
+
             if REFRESH_ENTRIES:
                 try:
                     if len(records) == 0:
                         if DRY_RUN:
-                            logger.info("DRY-RUN: POST to Cloudflare %s:, %s", domain_info['zone_id'], data)
+                            logger.info("DRY-RUN: Create Custom DNS record %s:, %s", name, domain_info['target_ip'])
                         else:
-                            _ = cf.zones.dns_records.post(domain_info['zone_id'], data=data)
-                        logger.info("Created new record: %s to point to %s", name, domain_info['target_domain'])
+                            _ = pihole.add_custom_dns_record(name, domain_info['target_ip'])
+                        logger.info("No existing entires, so created new record: %s to point to %s", name, domain_info['target_ip'])
                     else:
-                        for record in records:
-                            if DRY_RUN:
-                                logger.info("DRY-RUN: PUT to Cloudflare %s, %s:, %s", domain_info['zone_id'], record["id"], data)
-                            else:
-                                cf.zones.dns_records.put(domain_info['zone_id'], record["id"], data=data)
-                            logger.info("Updated existing record: %s to point to %s", name, domain_info['target_domain'])
-                except CloudFlare.exceptions.CloudFlareAPIError as ex:
-                    logger.error('** %s - %d %s' % (name, ex, ex))
+                        if DRY_RUN:
+                            logger.info("DRY-RUN: Deleting and recreating existing DNS record %s to point to %s", name, domain_info['target_ip'])
+                        else:
+                            pihole.update_custom_dns_record(name, domain_info['target_ip'])
+                        logger.info("Recreated existing DNS record: %s to point to %s", name, domain_info['target_ip'])
+                except PiHoleAPIError as ex:
+                    logger.error('** %s - %s' % (name, ex))
                     ok = False
                     pass
             else:
                 try:
                     if DRY_RUN:
-                        logger.info("DRY-RUN: POST to Cloudflare %s:, %s", domain_info['zone_id'], data)
+                        logger.info("DRY-RUN: Create DNS record %s:, %s", name, domain_info['target_ip'])
                     else:
-                        _ = cf.zones.dns_records.post(domain_info['zone_id'], data=data)
-                    logger.info("Created new record: %s to point to %s", name, domain_info['target_domain'])
-                except CloudFlare.exceptions.CloudFlareAPIError as ex:
-                    logger.error('** %s - %d %s' % (name, ex, ex))
+                        _ = pihole.add_custom_dns_record(name, domain_info['target_ip'])
+                    logger.info("Created new DNS record: %s to point to %s", name, domain_info['target_ip'])
+                except PiHoleAPIError as ex:
+                    logger.error('** %s - %s' % (name, ex))
                     ok = False
     return ok
 
@@ -399,9 +500,11 @@ def add_to_mappings(current_mappings, mappings):
 
 
 def sync_mappings(mappings, domain_infos):
+    # print("Mappings: ",mappings)
     for k, v in mappings.items():
         current_mapping = synced_mappings.get(k)
         if current_mapping is None or current_mapping > v:
+            # print("Pointing domain: ",k,"---:---",domain_infos)
             if point_domain(k, domain_infos):
                 synced_mappings[k] = v
 
@@ -457,8 +560,10 @@ def get_secret_by_env(envvar_name):
 
 try:
     # Check for uppercase docker secrets or env variables
-    email = get_secret_by_env('CF_EMAIL')
-    token = get_secret_by_env('CF_TOKEN')
+    # email = get_secret_by_env('CF_EMAIL')
+    # token = get_secret_by_env('CF_TOKEN')
+    ph_url = get_secret_by_env('PH_URL')
+    ph_token = get_secret_by_env('PH_TOKEN')
 
     # Check for any cf zone id based on the respective domain env var existing
     RX_DOMS = re.compile('^DOMAIN[0-9]+$', re.IGNORECASE)
@@ -466,15 +571,19 @@ try:
         if not RX_DOMS.match(env):
             continue
 
-        get_secret_by_env("{}_ZONE_ID".format(env))
+        # get_secret_by_env("{}_ZONE_ID".format(env))
 
     # Check for lowercase docker secrets
-    if not email:
-        email = get_docker_secret('CF_EMAIL', autocast_name=True, getenv=True)
-    if not token:
-        token = get_docker_secret('CF_TOKEN', autocast_name=True, getenv=True)
+    # if not email:
+    #     email = get_docker_secret('CF_EMAIL', autocast_name=True, getenv=True)
+    # if not token:
+    #     token = get_docker_secret('CF_TOKEN', autocast_name=True, getenv=True)
+    if not ph_token:
+        ph_token = get_docker_secret('PH_TOKEN', autocast_name=True, getenv=True)
+    if not ph_url:
+        ph_url = get_docker_secret('PH_URL', autocast_name=True, getenv=True)
 
-    target_domain = os.environ['TARGET_DOMAIN']
+    target_ip = os.environ['TARGET_IP']
     domain = os.environ['DOMAIN1']
 
 except KeyError as e:
@@ -514,15 +623,15 @@ logger.debug("Docker Polling: %s", ENABLE_DOCKER_POLL)
 logger.debug("Swarm Mode: %s", DOCKER_SWARM_MODE)
 logger.debug("Refresh Entries: %s", REFRESH_ENTRIES)
 logger.debug("Traefik Version: %s", TRAEFIK_VERSION)
-logger.debug("Default TTL: %s", DEFAULT_TTL)
 
-if not email:
-    logger.debug("API Mode: Scoped")
-    cf = CloudFlare.CloudFlare(debug=VERBOSE, token=token)
-else:
-    logger.debug("API Mode: Global")
-    cf = CloudFlare.CloudFlare(debug=VERBOSE, email=email, token=token)
+# if not email:
+#     logger.debug("API Mode: Scoped")
+#     cf = CloudFlare.CloudFlare(debug=VERBOSE, token=token)
+# else:
+#     logger.debug("API Mode: Global")
+#     cf = CloudFlare.CloudFlare(debug=VERBOSE, email=email, token=token)
 
+pihole = PiHoleAPI(ph_url, ph_token)
 
 if ENABLE_TRAEFIK_POLL:
     if TRAEFIK_VERSION == "2":

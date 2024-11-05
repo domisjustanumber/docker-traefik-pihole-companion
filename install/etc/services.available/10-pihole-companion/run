@@ -2,13 +2,13 @@
 
 source /assets/functions/00-container
 prepare_service defaults single
-PROCESS_NAME="traefik-cloudflare-companion"
+PROCESS_NAME="traefik-pihole-companion"
 
 check_container_initialized
 check_service_initialized init
 liftoff
 
-print_start "Starting Traefik Cloudflare Companion"
+print_start "Starting Traefik PiHole Companion"
 exec s6-setuidgid "${TCC_USER}" \
                                 python3 \
-                                        -u /usr/sbin/cloudflare-companion
+                                        -u /usr/sbin/pihole-companion
